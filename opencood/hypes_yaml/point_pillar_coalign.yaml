@@ -3,8 +3,8 @@
 # please refer to https://github.com/yifanlu0227/CoAlign
 
 name: point_pillar_coalign
-root_dir: "opv2v_data_dumping/train"
-validate_dir: "opv2v_data_dumping/validate"
+root_dir: "./data/OPV2V/train"
+validate_dir: "./data/OPV2V/validate"
 
 
 yaml_parser: "load_point_pillar_params"
@@ -66,7 +66,7 @@ model:
     voxel_size: *voxel_size
     lidar_range: *cav_lidar
     anchor_number: *achor_num
-    compression: 0 # compression rate
+    # compression: 0 # compression rate
 
     pillar_vfe:
       use_norm: true

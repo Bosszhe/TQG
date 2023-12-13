@@ -1,7 +1,7 @@
 name: point_pillar_intermediate_V2VAM_nocompressionV2
 sub_name: 
-root_dir: "opv2v_data_dumping/train"
-validate_dir: "opv2v_data_dumping/validate"
+root_dir: "./data/OPV2V/train"
+validate_dir: "./data/OPV2V/validate"
 
 yaml_parser: "load_point_pillar_params"
 train_params:

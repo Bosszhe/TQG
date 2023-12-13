@@ -1,9 +1,5 @@
-# -*- coding: utf-8 -*-
-# Author: Runsheng Xu <rxx3386@ucla.edu>
-# License: TDG-Attribution-NonCommercial-NoDistrib
-
 """
-Basedataset class for all kinds of fusion.
+Basedataset class for lidar data pre-processing
 """
 
 import os
@@ -23,9 +19,8 @@ from opencood.utils.transformation_utils import x1_to_x2
 
 class BaseDataset(Dataset):
     """
-    Base dataset for all kinds of fusion. Mainly used to initialize the
-    database and associate the __get_item__ index with the correct timestamp
-    and scenario.
+    Base dataset for all kinds of fusion. Mainly used to assign correct
+    index and add noise.
 
     Parameters
     __________
@@ -33,8 +28,7 @@ class BaseDataset(Dataset):
         The dictionary contains all parameters for training/testing.
 
     visualize : false
-        If set to true, the raw point cloud will be saved in the memory
-        for visualization.
+        If set to true, the dataset is used for visualization.
 
     Attributes
     ----------
@@ -44,16 +38,6 @@ class BaseDataset(Dataset):
     len_record : list
         The list to record each scenario's data length. This is used to
         retrieve the correct index during training.
-
-    pre_processor : opencood.pre_processor
-        Used to preprocess the raw data.
-
-    post_processor : opencood.post_processor
-        Used to generate training labels and convert the model outputs to
-        bbx formats.
-
-    data_augmentor : opencood.data_augmentor
-        Used to augment data.
 
     """
 
@@ -65,7 +49,7 @@ class BaseDataset(Dataset):
         self.pre_processor = None
         self.post_processor = None
         self.data_augmentor = DataAugmentor(params['data_augment'],
-                                            train)
+                                            train) 
 
         # if the training/testing include noisy setting
         if 'wild_setting' in params:
@@ -75,11 +59,11 @@ class BaseDataset(Dataset):
             self.async_mode = \
                 'sim' if 'async_mode' not in params['wild_setting'] \
                     else params['wild_setting']['async_mode']
-            self.async_overhead = params['wild_setting']['async_overhead']
+            self.async_overhead = params['wild_setting']['async_overhead'] 
 
             # localization error
             self.loc_err_flag = params['wild_setting']['loc_err']
-            self.xyz_noise_std = params['wild_setting']['xyz_std']
+            self.xyz_noise_std = params['wild_setting']['xyz_std']  
             self.ryp_noise_std = params['wild_setting']['ryp_std']
 
             # transmission data size
@@ -95,22 +79,21 @@ class BaseDataset(Dataset):
 
         else:
             self.async_flag = False
-            self.async_overhead = 0  # ms
+            self.async_overhead = 0  
             self.async_mode = 'sim'
             self.loc_err_flag = False
             self.xyz_noise_std = 0
             self.ryp_noise_std = 0
-            self.data_size = 0  # Mb (Megabits)
-            self.transmission_speed = 27  # Mbps
-            self.backbone_delay = 0  # ms
+            self.data_size = 0  
+            self.transmission_speed = 27  
+            self.backbone_delay = 0  
 
         if self.train:
             root_dir = params['root_dir']
         else:
             root_dir = params['validate_dir']
 
-        if 'train_params' not in params or\
-                'max_cav' not in params['train_params']:
+        if 'max_cav' not in params['train_params']:
             self.max_cav = 7
         else:
             self.max_cav = params['train_params']['max_cav']
@@ -121,6 +104,9 @@ class BaseDataset(Dataset):
                                    os.path.isdir(os.path.join(root_dir, x))])
         # Structure: {scenario_id : {cav_1 : {timestamp1 : {yaml: path,
         # lidar: path, cameras:list of path}}}}
+
+        # from IPython import embed
+        # embed(header='dataset')
         self.scenario_database = OrderedDict()
         self.len_record = []
 
@@ -129,7 +115,7 @@ class BaseDataset(Dataset):
             self.scenario_database.update({i: OrderedDict()})
 
             # at least 1 cav should show up
-            cav_list = sorted([x for x in os.listdir(scenario_folder)
+            cav_list = sorted([x for x in os.listdir(scenario_folder)  
                                if os.path.isdir(
                     os.path.join(scenario_folder, x))])
             assert len(cav_list) > 0
@@ -141,9 +127,10 @@ class BaseDataset(Dataset):
                 cav_list = cav_list[1:] + [cav_list[0]]
 
             # loop over all CAV data
-            for (j, cav_id) in enumerate(cav_list):
+            for (j, cav_id) in enumerate(cav_list):  
                 if j > self.max_cav - 1:
                     print('too many cavs')
+                    print(scenario_folder)
                     break
                 self.scenario_database[i][cav_id] = OrderedDict()
 
@@ -157,7 +144,7 @@ class BaseDataset(Dataset):
                             x.endswith('.yaml') and 'additional' not in x])
                 timestamps = self.extract_timestamps(yaml_files)
 
-                for timestamp in timestamps:
+                for timestamp in timestamps:  
                     self.scenario_database[i][cav_id][timestamp] = \
                         OrderedDict()
 
@@ -177,8 +164,7 @@ class BaseDataset(Dataset):
                 # we only need to calculate for the first vehicle in the
                 # scene.
                 if j == 0:
-                    # we regard the agent with the minimum id as the ego
-                    self.scenario_database[i][cav_id]['ego'] = True
+                    self.scenario_database[i][cav_id]['ego'] = True  
                     if not self.len_record:
                         self.len_record.append(len(timestamps))
                     else:
@@ -186,6 +172,12 @@ class BaseDataset(Dataset):
                         self.len_record.append(prev_last + len(timestamps))
                 else:
                     self.scenario_database[i][cav_id]['ego'] = False
+        #     print(scenario_folder)
+        #     print(timestamps)
+        #     print(self.len_record)
+        # from IPython import embed
+        # embed(header='init')
+        
 
     def __len__(self):
         return self.len_record[-1]
@@ -195,6 +187,40 @@ class BaseDataset(Dataset):
         Abstract method, needs to be define by the children class.
         """
         pass
+    
+    def retrieve_multi_data(self, idx, select_num, cur_ego_pose_flag=True):
+        scenario_index = 0
+        for i, ele in enumerate(self.len_record):
+            if idx < ele:
+                scenario_index = i
+                break
+
+        # check the timestamp index
+        timestamp_index = idx if scenario_index == 0 else \
+            idx - self.len_record[scenario_index - 1]
+            
+        if timestamp_index < select_num:
+            idx += select_num
+        
+        select_dict = OrderedDict()
+        scenario_index_list = []
+        index_list = []
+        scenario_index = 0
+        timestamp_key = 0
+        for j in range(idx,idx-select_num-1,-1): 
+            if j == idx:
+                base_data_dict,cur_scenario,cur_timestamp = self.retrieve_base_data(j,cur_ego_pose_flag)
+                scenario_index = cur_scenario
+                timestamp_key = cur_timestamp
+            else:
+                # from IPython import embed
+                # embed(header='before')
+                base_data_dict = self.retrieve_base_data_before(scenario_index,j,timestamp_key,cur_ego_pose_flag)
+            scenario_index_list.append(scenario_index)
+            index_list.append(j)
+            select_dict[j] = base_data_dict
+        return select_dict,scenario_index_list,index_list,timestamp_index
+            
 
     def retrieve_base_data(self, idx, cur_ego_pose_flag=True):
         """
@@ -207,10 +233,7 @@ class BaseDataset(Dataset):
 
         cur_ego_pose_flag : bool
             Indicate whether to use current timestamp ego pose to calculate
-            transformation matrix. If set to false, meaning when other cavs
-            project their LiDAR point cloud to ego, they are projecting to
-            past ego pose.
-
+            transformation matrix.
         Returns
         -------
         data : dict
@@ -219,11 +242,11 @@ class BaseDataset(Dataset):
         """
         # we loop the accumulated length list to see get the scenario index
         scenario_index = 0
-        for i, ele in enumerate(self.len_record):
+        for i, ele in enumerate(self.len_record): 
             if idx < ele:
                 scenario_index = i
                 break
-        scenario_database = self.scenario_database[scenario_index]
+        scenario_database = self.scenario_database[scenario_index] 
 
         # check the timestamp index
         timestamp_index = idx if scenario_index == 0 else \
@@ -231,13 +254,15 @@ class BaseDataset(Dataset):
         # retrieve the corresponding timestamp key
         timestamp_key = self.return_timestamp_key(scenario_database,
                                                   timestamp_index)
-        # calculate distance to ego for each cav
+        # calculate distance to ego for each cav for time delay estimation
         ego_cav_content = \
-            self.calc_dist_to_ego(scenario_database, timestamp_key)
+            self.calc_dist_to_ego(scenario_database, timestamp_key) 
 
         data = OrderedDict()
-        # load files for all CAVs
-        for cav_id, cav_content in scenario_database.items():
+        # load files for all CAVs self.scenario_database[i][cav_id]['ego'] = True
+        for cav_id, cav_content in scenario_database.items():  
+            # from IPython import embed
+            # embed(header="retrieve_base_data")
             data[cav_id] = OrderedDict()
             data[cav_id]['ego'] = cav_content['ego']
 
@@ -249,17 +274,89 @@ class BaseDataset(Dataset):
                 timestamp_delay = timestamp_index
             timestamp_index_delay = max(0, timestamp_index - timestamp_delay)
             timestamp_key_delay = self.return_timestamp_key(scenario_database,
-                                                            timestamp_index_delay)
+                                                            timestamp_index_delay)  
             # add time delay to vehicle parameters
             data[cav_id]['time_delay'] = timestamp_delay
             # load the corresponding data into the dictionary
             data[cav_id]['params'] = self.reform_param(cav_content,
-                                                       ego_cav_content,
-                                                       timestamp_key,
-                                                       timestamp_key_delay,
-                                                       cur_ego_pose_flag)
+                                                    ego_cav_content,
+                                                    timestamp_key,
+                                                    timestamp_key_delay,
+                                                    cur_ego_pose_flag)
             data[cav_id]['lidar_np'] = \
                 pcd_utils.pcd_to_np(cav_content[timestamp_key_delay]['lidar'])
+            # data[cav_id]['cur_lidar_np'] = \
+            #     pcd_utils.pcd_to_np(cav_content[timestamp_key]['lidar'])
+        return data,scenario_index,timestamp_key
+    
+    def retrieve_base_data_before(self, scenario_index, idx, cur_timestamp_key, cur_ego_pose_flag=True):
+        
+        scenario_database = self.scenario_database[scenario_index]  
+
+        # check the timestamp index
+        timestamp_index = idx if scenario_index == 0 else \
+            idx - self.len_record[scenario_index - 1]
+        # retrieve the corresponding timestamp key
+        timestamp_key = self.return_timestamp_key(scenario_database,
+                                                  timestamp_index)
+        # calculate distance to ego for each cav for time delay estimation
+        ego_cav_content = \
+            self.calc_dist_to_ego(scenario_database, timestamp_key)  
+
+        data = OrderedDict()
+        # load files for all CAVs self.scenario_database[i][cav_id]['ego'] = True
+        for cav_id, cav_content in scenario_database.items(): 
+            data[cav_id] = OrderedDict()
+            data[cav_id]['ego'] = cav_content['ego']
+
+            # calculate delay for this vehicle
+            timestamp_delay = \
+                self.time_delay_calculation(cav_content['ego'])
+
+            if timestamp_index - timestamp_delay <= 0:
+                timestamp_delay = timestamp_index
+            timestamp_index_delay = max(0, timestamp_index - timestamp_delay)
+            timestamp_key_delay = self.return_timestamp_key(scenario_database,
+                                                            timestamp_index_delay) 
+            # add time delay to vehicle parameters
+            data[cav_id]['time_delay'] = timestamp_delay
+            # load the corresponding data into the dictionary 
+            # from IPython import embed
+            # embed(header='b')
+            data[cav_id]['params'] = self.reform_param(cav_content,
+                                                    ego_cav_content,
+                                                    cur_timestamp_key,
+                                                    timestamp_key_delay,
+                                                    cur_ego_pose_flag)
+            data[cav_id]['lidar_np'] = \
+                pcd_utils.pcd_to_np(cav_content[timestamp_key_delay]['lidar'])
+        
+
+            # if cav_content['ego']: 
+            #     data[cav_id] = OrderedDict()
+            #     data[cav_id]['ego'] = cav_content['ego']
+
+            #     # calculate delay for this vehicle
+            #     timestamp_delay = \
+            #         self.time_delay_calculation(cav_content['ego'])
+
+            #     if timestamp_index - timestamp_delay <= 0:
+            #         timestamp_delay = timestamp_index
+            #     timestamp_index_delay = max(0, timestamp_index - timestamp_delay)
+            #     timestamp_key_delay = self.return_timestamp_key(scenario_database,
+            #                                                     timestamp_index_delay) 
+            #     # add time delay to vehicle parameters
+            #     data[cav_id]['time_delay'] = timestamp_delay
+            #     # load the corresponding data into the dictionary 
+            #     # from IPython import embed
+            #     # embed(header='b')
+            #     data[cav_id]['params'] = self.reform_param(cav_content,
+            #                                             ego_cav_content,
+            #                                             cur_timestamp_key,
+            #                                             timestamp_key_delay,
+            #                                             cur_ego_pose_flag)
+            #     data[cav_id]['lidar_np'] = \
+            #         pcd_utils.pcd_to_np(cav_content[timestamp_key_delay]['lidar'])
         return data
 
     @staticmethod
@@ -361,17 +458,13 @@ class BaseDataset(Dataset):
             return 0
         # time delay real mode
         if self.async_mode == 'real':
-            # in the real mode, time delay = systematic async time + data
-            # transmission time + backbone computation time
+            # noise/time is in ms unit
             overhead_noise = np.random.uniform(0, self.async_overhead)
             tc = self.data_size / self.transmission_speed * 1000
             time_delay = int(overhead_noise + tc + self.backbone_delay)
         elif self.async_mode == 'sim':
-            # in the simulation mode, the time delay is constant
             time_delay = np.abs(self.async_overhead)
 
-        # the data is 10 hz for both opv2v and v2x-set
-        # todo: it may not be true for other dataset like DAIR-V2X and V2X-Sim
         time_delay = time_delay // 100
         return time_delay if self.async_flag else 0
 
@@ -405,11 +498,11 @@ class BaseDataset(Dataset):
                      timestamp_delay, cur_ego_pose_flag):
         """
         Reform the data params with current timestamp object groundtruth and
-        delay timestamp LiDAR pose for other CAVs.
+        delay timestamp LiDAR pose.
 
         Parameters
         ----------
-        cav_content : dict
+        cav_content : dict  
             Dictionary that contains all file paths in the current cav/rsu.
 
         ego_content : dict
@@ -525,18 +618,7 @@ class BaseDataset(Dataset):
 
     def augment(self, lidar_np, object_bbx_center, object_bbx_mask):
         """
-        Given the raw point cloud, augment by flipping and rotation.
-
-        Parameters
-        ----------
-        lidar_np : np.ndarray
-            (n, 4) shape
-
-        object_bbx_center : np.ndarray
-            (n, 7) shape to represent bbx's x, y, z, h, w, l, yaw
-
-        object_bbx_mask : np.ndarray
-            Indicate which elements in object_bbx_center are padded.
+        Data augmentation operation.
         """
         tmp_dict = {'lidar_np': lidar_np,
                     'object_bbx_center': object_bbx_center,
@@ -552,7 +634,7 @@ class BaseDataset(Dataset):
     def collate_batch_train(self, batch):
         """
         Customized collate function for pytorch dataloader during training
-        for early and late fusion dataset.
+        for late fusion dataset.
 
         Parameters
         ----------
@@ -610,7 +692,6 @@ class BaseDataset(Dataset):
                          show_vis,
                          save_path,
                          dataset=None):
-        # visualize the model output
         self.post_processor.visualize(pred_box_tensor,
                                       gt_tensor,
                                       pcd,

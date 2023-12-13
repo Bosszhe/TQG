@@ -43,6 +43,8 @@ class PointPillarScatter(nn.Module):
             batch_spatial_features.view(batch_size, self.num_bev_features *
                                         self.nz, self.ny, self.nx)
         batch_dict['spatial_features'] = batch_spatial_features
-
+        # if not batch_dict['record_len'].sum() == batch_spatial_features.shape[0]:
+        #     from IPython import embed
+        #     embed()
         return batch_dict
 

@@ -258,7 +258,6 @@ class VoxelPostprocessor(BasePostprocessor):
         # the final bounding box list
         pred_box3d_list = []
         pred_box2d_list = []
-
         for cav_id, cav_content in data_dict.items():
             assert cav_id in output_dict
             # the transformation matrix to ego space

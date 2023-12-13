@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "SCOPE",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/opencood/tools/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args":"--hypes_yaml opencood/hypes_yaml/point_pillar_scope.yaml --fusion_method intermediate"
+        },
+    ]
+}

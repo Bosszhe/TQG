@@ -1,6 +1,6 @@
 name: point_pillar_where2comm
-root_dir: '/data/opv2x/train'
-validate_dir: '/data/opv2x/validate'
+root_dir: './data/OPV2V/train'
+validate_dir: './data/OPV2V/validate'
 
 
 wild_setting:

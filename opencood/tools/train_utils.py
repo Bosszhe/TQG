@@ -15,7 +15,7 @@ import torch
 import torch.optim as optim
 import timm
 
-def load_saved_model(saved_path, model):
+def load_saved_model(saved_path, model, epoch=None):
     """
     Load saved model if exiseted
 
@@ -47,7 +47,13 @@ def load_saved_model(saved_path, model):
             initial_epoch_ = 0
         return initial_epoch_
 
-    initial_epoch = findLastCheckpoint(saved_path)
+    # initial_epoch = findLastCheckpoint(saved_path)
+
+    if epoch is None:
+        initial_epoch = findLastCheckpoint(saved_path)
+    else:
+        initial_epoch = int(epoch)
+        
     if initial_epoch > 0:
         model_file = os.path.join(saved_path,
                          'net_epoch%d.pth' % initial_epoch) \

@@ -44,7 +44,6 @@ class PointPillarIntermediate(nn.Module):
         batch_dict = self.pillar_vfe(batch_dict)
         batch_dict = self.scatter(batch_dict)
         batch_dict = self.backbone(batch_dict)
-
         spatial_features_2d = batch_dict['spatial_features_2d']
 
         psm = self.cls_head(spatial_features_2d)

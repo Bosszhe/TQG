@@ -49,6 +49,9 @@ class AttFusion(nn.Module):
         self.att = ScaledDotProductAttention(feature_dim)
 
     def forward(self, x, record_len):
+        if not x.shape[0] == sum(record_len):
+          from IPython import embed
+          embed()
         split_x = self.regroup(x, record_len)
         C, W, H = split_x[0].shape[1:]
         out = []

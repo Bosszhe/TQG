@@ -114,7 +114,6 @@ class AttBEVBackbone(nn.Module):
     def forward(self, data_dict):
         spatial_features = data_dict['spatial_features']
         record_len = data_dict['record_len']
-
         ups = []
         ret_dict = {}
         x = spatial_features

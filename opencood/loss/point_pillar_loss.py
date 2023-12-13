@@ -81,15 +81,15 @@ class PointPillarLoss(nn.Module):
         self.reg_coe = args['reg']
         self.loss_dict = {}
 
-    def forward(self, output_dict, target_dict):
+    def forward(self, output_dict, target_dict, prefix=''):
         """
         Parameters
         ----------
         output_dict : dict
         target_dict : dict
         """
-        rm = output_dict['rm']
-        psm = output_dict['psm']
+        rm = output_dict['rm{}'.format(prefix)] 
+        psm = output_dict['psm{}'.format(prefix)]
         targets = target_dict['targets']
 
         cls_preds = psm.permute(0, 2, 3, 1).contiguous()
@@ -139,9 +139,9 @@ class PointPillarLoss(nn.Module):
 
         total_loss = reg_loss + conf_loss
 
-        self.loss_dict.update({'total_loss': total_loss,
-                               'reg_loss': reg_loss,
-                               'conf_loss': conf_loss})
+        self.loss_dict.update({'total_loss{}'.format(prefix): total_loss,
+                               'reg_loss{}'.format(prefix): reg_loss,
+                               'conf_loss{}'.format(prefix): conf_loss})
 
         return total_loss
 

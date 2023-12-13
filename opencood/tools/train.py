@@ -8,33 +8,44 @@ import os
 import statistics
 
 import torch
-import tqdm
+# import tqdm
+from tqdm import tqdm
 from tensorboardX import SummaryWriter
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import DataLoader, DistributedSampler, Subset
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils
+from opencood.tools import train_utils, inference_utils
 from opencood.tools import multi_gpu_utils
 from opencood.data_utils.datasets import build_dataset
-from opencood.tools import train_utils
+# from opencood.tools import train_utils
+from opencood.utils import eval_utils
 
 
 def train_parser():
     parser = argparse.ArgumentParser(description="synthetic data generation")
     parser.add_argument("--hypes_yaml", type=str, required=True,
+                        default='opencood/hypes_yaml/point_pillar_scope.yaml',
                         help='data generation yaml file needed ')
     parser.add_argument('--model_dir', default='',
                         help='Continued training path')
+    parser.add_argument('--fusion_method', required=True, type=str,
+                        default='intermediate',
+                        help='late, early or intermediate')
     parser.add_argument("--half", action='store_true',
                         help="whether train with half precision.")
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    parser.add_argument('--global_sort_detections', action='store_true',
+                        help='whether to globally sort detections by confidence score.'
+                             'If set to True, it is the mainstream AP computing method,'
+                             'but would increase the tolerance for FP (False Positives).')
     opt = parser.parse_args()
     return opt
 
 
 def main():
     opt = train_parser()
+    assert opt.fusion_method in ['late', 'early', 'intermediate']
     hypes = yaml_utils.load_yaml(opt.hypes_yaml, opt)
 
     multi_gpu_utils.init_distributed_mode(opt)
@@ -42,6 +53,7 @@ def main():
     print('-----------------Dataset Building------------------')
     opencood_train_dataset = build_dataset(hypes, visualize=False, train=True)
     opencood_validate_dataset = build_dataset(hypes, visualize=False, train=False)
+    # subset = Subset(opencood_train_dataset, range(6100,6108))
 
     if opt.distributed:
         sampler_train = DistributedSampler(opencood_train_dataset)
@@ -60,6 +72,11 @@ def main():
                                 num_workers=8,
                                 collate_fn=opencood_train_dataset.collate_batch_train,
                                 drop_last=False)
+        infer_data_loader = DataLoader(opencood_validate_dataset,
+                    sampler=sampler_val,
+                    num_workers=16,
+                    collate_fn=opencood_train_dataset.collate_batch_test,
+                    drop_last=False)
     else:
         train_loader = DataLoader(opencood_train_dataset,
                                   batch_size=hypes['train_params']['batch_size'],
@@ -75,11 +92,18 @@ def main():
                                 shuffle=False,
                                 pin_memory=False,
                                 drop_last=True)
+        infer_data_loader = DataLoader(opencood_validate_dataset,
+                            batch_size=1,
+                            num_workers=16,
+                            collate_fn=opencood_train_dataset.collate_batch_test,
+                            shuffle=False,
+                            pin_memory=False,
+                            drop_last=False)
 
     print('---------------Creating Model------------------')
     model = train_utils.create_model(hypes)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+    split = hypes['validate_dir'].split('/')[-1]
     # if we want to train from last checkpoint.
     if opt.model_dir:
         saved_path = opt.model_dir
@@ -135,14 +159,23 @@ def main():
         if opt.distributed:
             sampler_train.set_epoch(epoch)
 
-        pbar2 = tqdm.tqdm(total=len(train_loader), leave=True)
+        pbar2 = tqdm(total=len(train_loader), leave=True)
 
-        for i, batch_data in enumerate(train_loader):
+        for i, batch_data_list in enumerate(train_loader):
+            
+            # print(i)
+
+            # continue
+            # if i > 5 :
+            #     break
             # the model will be evaluation mode during validation
             model.train()
             model.zero_grad()
             optimizer.zero_grad()
 
+            batch_data = batch_data_list[0]
+            
+            batch_data_list = train_utils.to_device(batch_data_list, device)
             batch_data = train_utils.to_device(batch_data, device)
 
             # case1 : late fusion train --> only ego needed,
@@ -152,16 +185,12 @@ def main():
             # becomes a list, which containing all data from other cavs
             # as well
             if not opt.half:
-                ouput_dict = model(batch_data['ego'])
-                # first argument is always your output dictionary,
-                # second argument is always your label dictionary.
-                final_loss = criterion(ouput_dict,
-                                       batch_data['ego']['label_dict'])
+                ouput_dict = model(batch_data_list)
+                final_loss = criterion(ouput_dict, batch_data['ego']['label_dict'])
             else:
                 with torch.cuda.amp.autocast():
-                    ouput_dict = model(batch_data['ego'])
-                    final_loss = criterion(ouput_dict,
-                                           batch_data['ego']['label_dict'])
+                    ouput_dict = model(batch_data_list)
+                    final_loss = criterion(ouput_dict, batch_data['ego']['label_dict'])
 
 
             criterion.logging(epoch, i, len(train_loader), writer, pbar=pbar2)
@@ -184,13 +213,23 @@ def main():
 
         if epoch % hypes['train_params']['eval_freq'] == 0:
             valid_ave_loss = []
-
+            # Create the dictionary for evaluation.
+            # also store the confidence score for each prediction
+            result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
+                   0.5: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
+                   0.7: {'tp': [], 'fp': [], 'gt': 0, 'score': []}}
+            
             with torch.no_grad():
-                for i, batch_data in enumerate(val_loader):
+                for j, batch_data_list in tqdm(enumerate(val_loader)):
+                    # print(j)
+                    # if j > 10:
+                    #     break
+                    batch_data = batch_data_list[0]
                     model.eval()
-
+                    
+                    batch_data_list = train_utils.to_device(batch_data_list, device)
                     batch_data = train_utils.to_device(batch_data, device)
-                    ouput_dict = model(batch_data['ego'])
+                    ouput_dict = model(batch_data_list)
 
                     final_loss = criterion(ouput_dict,
                                            batch_data['ego']['label_dict'])
@@ -199,6 +238,65 @@ def main():
             print('At epoch %d, the validation loss is %f' % (epoch,
                                                               valid_ave_loss))
             writer.add_scalar('Validate_Loss', valid_ave_loss, epoch)
+
+            with torch.no_grad():
+                for j, batch_data_list in tqdm(enumerate(infer_data_loader)):
+                    # print(j)
+                    # if j > 10:
+                    #     break
+                    model.eval()
+                    batch_data = batch_data_list[0]
+                    batch_data = train_utils.to_device(batch_data, device)
+                    batch_data_list = train_utils.to_device(batch_data_list, device)
+                    if opt.fusion_method == 'late':
+
+                        pred_box_tensor, pred_score, gt_box_tensor = \
+                            inference_utils.inference_late_fusion(batch_data,
+                                                                model,
+                                                                opencood_validate_dataset)
+                    elif opt.fusion_method == 'early':
+
+                        pred_box_tensor, pred_score, gt_box_tensor = \
+                            inference_utils.inference_early_fusion(batch_data,
+                                                                model,
+                                                                opencood_validate_dataset)
+                    elif opt.fusion_method == 'intermediate':
+                        pred_box_tensor, pred_score, gt_box_tensor = \
+                            inference_utils.inference_intermediate_fusion(batch_data_list,
+                                                                        model,
+                                                                        opencood_validate_dataset)
+                    else:
+                        raise NotImplementedError('Only early, late and intermediate'
+                                                'fusion is supported.')
+
+                    eval_utils.caluclate_tp_fp(pred_box_tensor,
+                                            pred_score,
+                                            gt_box_tensor,
+                                            result_stat,
+                                            0.3)
+                    eval_utils.caluclate_tp_fp(pred_box_tensor,
+                                            pred_score,
+                                            gt_box_tensor,
+                                            result_stat,
+                                            0.5)
+                    eval_utils.caluclate_tp_fp(pred_box_tensor,
+                                            pred_score,
+                                            gt_box_tensor,
+                                            result_stat,
+                                            0.7)
+            ap_30,ap_50,ap_70 = eval_utils.eval_final_results(result_stat,
+                                opt.model_dir,
+                                opt.global_sort_detections)
+
+            with open(os.path.join(saved_path, 'result.txt'), 'a+') as f:
+                msg = 'Split: {} | Epoch: {} | AP @0.3: {:.04f} | AP @0.5: {:.04f} | AP @0.7: {:.04f} \n'.format(split,epoch, ap_30, ap_50, ap_70)
+                f.write(msg)
+                print(msg)
+
+
+            writer.add_scalar('AP_30', ap_30, epoch)
+            writer.add_scalar('AP_50', ap_50, epoch)
+            writer.add_scalar('AP_70', ap_70, epoch)
 
     print('Training Finished, checkpoints saved to %s' % saved_path)
 

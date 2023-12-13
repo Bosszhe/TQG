@@ -27,6 +27,8 @@ def test_parser():
     parser.add_argument('--fusion_method', required=True, type=str,
                         default='late',
                         help='late, early or intermediate')
+    parser.add_argument('--eval_epoch', type=str, default=None,
+                        help='Set the checkpoint')
     parser.add_argument('--show_vis', action='store_true',
                         help='whether to show image visualization result')
     parser.add_argument('--show_sequence', action='store_true',
@@ -74,7 +76,11 @@ def main():
 
     print('Loading Model from checkpoint')
     saved_path = opt.model_dir
-    _, model = train_utils.load_saved_model(saved_path, model)
+    split = hypes['validate_dir'].split('/')[-1]
+
+    epoch_id = opt.eval_epoch
+    
+    _, model = train_utils.load_saved_model(saved_path, model, epoch_id)
     model.eval()
 
     # Create the dictionary for evaluation.
@@ -197,9 +203,15 @@ def main():
                 vis.update_renderer()
                 time.sleep(0.001)
 
-    eval_utils.eval_final_results(result_stat,
+    ap_30,ap_50,ap_70 = eval_utils.eval_final_results(result_stat,
                                   opt.model_dir,
                                   opt.global_sort_detections)
+    
+    with open(os.path.join(saved_path, 'result.txt'), 'a+') as f:
+        msg = 'Split: {} | Epoch: {} | AP @0.3: {:.04f} | AP @0.5: {:.04f} | AP @0.7: {:.04f} \n'.format(split,epoch_id, ap_30, ap_50, ap_70)
+        f.write(msg)
+        print(msg)
+
     if opt.show_sequence:
         vis.destroy_window()
 
