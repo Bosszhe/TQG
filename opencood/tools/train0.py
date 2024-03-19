@@ -20,6 +20,8 @@ from opencood.data_utils.datasets import build_dataset
 # from opencood.tools import train_utils
 from opencood.utils import eval_utils
 
+import numpy as np
+import random
 
 def train_parser():
     parser = argparse.ArgumentParser(description="synthetic data generation")
@@ -27,7 +29,7 @@ def train_parser():
                         help='data generation yaml file needed ')
     parser.add_argument('--model_dir', default='',
                         help='Continued training path')
-    parser.add_argument('--fusion_method', required=False, type=str,
+    parser.add_argument('--fusion_method', required=True, type=str,
                         default='intermediate',
                         help='late, early or intermediate')
     parser.add_argument("--half", action='store_true',
@@ -41,9 +43,22 @@ def train_parser():
     opt = parser.parse_args()
     return opt
 
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 def main():
     opt = train_parser()
+
+    # 设置随机数种子
+    setup_seed(42)
+
     assert opt.fusion_method in ['late', 'early', 'intermediate']
     hypes = yaml_utils.load_yaml(opt.hypes_yaml, opt)
 
@@ -93,7 +108,7 @@ def main():
                                 drop_last=True)
         infer_data_loader = DataLoader(opencood_validate_dataset,
                             batch_size=1,
-                            num_workers=0,
+                            num_workers=16,
                             collate_fn=opencood_train_dataset.collate_batch_test,
                             shuffle=False,
                             pin_memory=False,

@@ -261,14 +261,14 @@ def setup_lr_schedular(hypes, optimizer, n_iter_per_epoch):
 
     return scheduler
 
-
+import numpy as np
 def to_device(inputs, device):
     if isinstance(inputs, list):
         return [to_device(x, device) for x in inputs]
     elif isinstance(inputs, dict):
         return {k: to_device(v, device) for k, v in inputs.items()}
     else:
-        if isinstance(inputs, int) or isinstance(inputs, float) \
+        if isinstance(inputs, int) or isinstance(inputs, float) or isinstance(inputs, np.ndarray)\
                 or isinstance(inputs, str):
             return inputs
         return inputs.to(device)

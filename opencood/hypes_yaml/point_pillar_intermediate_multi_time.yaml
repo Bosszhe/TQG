@@ -1,6 +1,6 @@
 num_sweep_frames: &past_k 3
 binomial_n: 10
-binomial_p: 1.0
+binomial_p: 0.1
 is_same_sample_interval: False
 data_augment:
 - ALONG_AXIS_LIST:
@@ -104,8 +104,9 @@ model:
     - 0.4
     - 4
     async_mode: true
+    time_delay: 2
   core_method: point_pillar_intermediate_irregular
-name: OPV2V_pp_AttnFusionIrregular_onlyego
+name: OPV2V_pp_AttnFusionIrregular_tt
 optimizer:
   args:
     eps: 1.0e-10

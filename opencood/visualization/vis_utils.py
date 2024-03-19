@@ -293,8 +293,6 @@ def visualize_single_sample_output_gt(pred_tensor,
         vis.run()
         vis.destroy_window()
 
-    if len(pcd.shape) == 3:
-        pcd = pcd[0]
     origin_lidar = pcd
     if not isinstance(pcd, np.ndarray):
         origin_lidar = common_utils.torch_tensor_to_numpy(pcd)
@@ -485,10 +483,6 @@ def visualize_inference_sample_dataloader(pred_box_tensor,
     # we only visualize the first cav for single sample
     if len(origin_lidar.shape) > 2:
         origin_lidar = origin_lidar[0]
-    # this is for 2-stage origin lidar, it has different format
-    if origin_lidar.shape[1] > 4:
-        origin_lidar = origin_lidar[:, 1:]
-
     origin_lidar_intcolor = \
         color_encoding(origin_lidar[:, -1] if mode == 'intensity'
                        else origin_lidar[:, 2], mode=mode)
@@ -611,7 +605,6 @@ def visualize_bev(batch_data):
     plt.axis("off")
     plt.show()
 
-
 def draw_box_plt(boxes_dec, ax, color=None, linewidth_scale=1.0):
     """
     draw boxes in a given plt ax
@@ -669,4 +662,4 @@ def draw_points_boxes_plt(pc_range, points=None, boxes_pred=None, boxes_gt=None,
     plt.savefig(save_path)
     if return_ax:
         return ax
-    plt.close()
+    plt.close() 

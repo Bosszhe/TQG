@@ -6,18 +6,20 @@ from opencood.data_utils.post_processor.voxel_postprocessor import VoxelPostproc
 from opencood.data_utils.post_processor.bev_postprocessor import BevPostprocessor
 from opencood.data_utils.post_processor.ciassd_postprocessor import CiassdPostprocessor
 from opencood.data_utils.post_processor.fpvrcnn_postprocessor import FpvrcnnPostprocessor
+from opencood.data_utils.post_processor.detr3d_postprocessor import DETR3DPostprocessor
 
 __all__ = {
     'VoxelPostprocessor': VoxelPostprocessor,
     'BevPostprocessor': BevPostprocessor,
     'CiassdPostprocessor': CiassdPostprocessor,
     'FpvrcnnPostprocessor': FpvrcnnPostprocessor,
+    'DETR3DPostprocessor': DETR3DPostprocessor,
 }
 
 
 def build_postprocessor(anchor_cfg, train):
     process_method_name = anchor_cfg['core_method']
-    assert process_method_name in ['VoxelPostprocessor', 'BevPostprocessor', 'CiassdPostprocessor', 'FpvrcnnPostprocessor']
+    assert process_method_name in ['VoxelPostprocessor', 'BevPostprocessor', 'CiassdPostprocessor', 'FpvrcnnPostprocessor', 'DETR3DPostprocessor']
     anchor_generator = __all__[process_method_name](
         anchor_params=anchor_cfg,
         train=train

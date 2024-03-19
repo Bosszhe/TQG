@@ -93,7 +93,6 @@ class PointPillarLoss(nn.Module):
         targets = target_dict['targets']
 
         cls_preds = psm.permute(0, 2, 3, 1).contiguous()
-
         box_cls_labels = target_dict['pos_equal_one']
         box_cls_labels = box_cls_labels.view(psm.shape[0], -1).contiguous()
 

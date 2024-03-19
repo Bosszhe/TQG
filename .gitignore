@@ -140,3 +140,6 @@ DCOS.md
 spconv/
 
 data/
+vis/
+
+*.png

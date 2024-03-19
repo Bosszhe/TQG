@@ -189,7 +189,7 @@ class BaseDataset(Dataset):
 
     def __len__(self):
         return self.len_record[-1]
-        # return self.len_record[0]
+        # return 10
 
     def __getitem__(self, idx):
         """

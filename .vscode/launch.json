@@ -5,6 +5,9 @@
     "version": "0.2.0",
     "configurations": [
 
+
+
+    
         {
             "name": "SCOPE",
             "type": "python",
@@ -13,6 +16,52 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args":"--hypes_yaml opencood/hypes_yaml/point_pillar_scope.yaml --fusion_method intermediate"
+        },
+        {
+            "name": "EF",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/opencood/tools/train0.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--hypes_yaml", "opencood/hypes_yaml/point_pillar_early_fusion.yaml",
+                "--fusion_method", "early"
+            ]
+        },
+        {
+            "name": "EF_DETR3D_Infer",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/opencood/tools/inference.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--model_dir", "opencood/logs/OPV2V_DETR3D/OPV2V_ppef_detr3d_111_bs4_withaux_2024_01_27_23_45_21",
+                "--fusion_method", "detr3d","--eval_epoch", "20"
+            ]
+        },
+        {
+            "name": "EF_DETR3D_Train",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/opencood/tools/train_detr3d.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--hypes_yaml", "opencood/hypes_yaml/point_pillar_detr3d_early_fusion.yaml", "--fusion_method", "detr3d"
+            ]
+        },
+        {
+            "name": "IF_DETR3D_Train",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/opencood/tools/train_detr3d.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--hypes_yaml", "opencood/hypes_yaml/point_pillar_detr3d_IF.yaml", "--fusion_method", "detr3d"
+            ]
         },
     ]
 }

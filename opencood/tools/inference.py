@@ -19,6 +19,9 @@ from opencood.utils import eval_utils
 from opencood.visualization import vis_utils
 import matplotlib.pyplot as plt
 
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+
 
 def test_parser():
     parser = argparse.ArgumentParser(description="synthetic data generation")
@@ -49,7 +52,7 @@ def test_parser():
 
 def main():
     opt = test_parser()
-    assert opt.fusion_method in ['late', 'early', 'intermediate']
+    assert opt.fusion_method in ['late', 'early', 'intermediate', 'detr3d']
     assert not (opt.show_vis and opt.show_sequence), 'you can only visualize ' \
                                                     'the results in single ' \
                                                     'image mode or video mode'
@@ -125,9 +128,24 @@ def main():
                     inference_utils.inference_intermediate_fusion(batch_data,
                                                                   model,
                                                                   opencood_dataset)
+            elif opt.fusion_method == 'detr3d':
+                pred_box_tensor, pred_score, gt_box_tensor = \
+                    inference_utils.inference_detr3d_fusion(batch_data,
+                                                                  model,
+                                                                  opencood_dataset)
             else:
                 raise NotImplementedError('Only early, late and intermediate'
                                           'fusion is supported.')
+            
+            # with open(os.path.join(saved_path, 'bbox_num.txt'), 'a+') as f:
+            #     msg = '\n pred_box_tensor:{} gt_box_tensor:{}'.format(pred_box_tensor.shape[0],gt_box_tensor.shape[0])
+            #     f.write(msg)
+            #     print(msg)
+            if pred_box_tensor is not None:
+                pp = pred_box_tensor.detach().cpu().numpy()
+                ll = gt_box_tensor.detach().cpu().numpy()
+                vis_pred_label_2(pp,ll,str(i))
+
 
             eval_utils.caluclate_tp_fp(pred_box_tensor,
                                        pred_score,
@@ -215,6 +233,29 @@ def main():
     if opt.show_sequence:
         vis.destroy_window()
 
+
+from os import path as osp
+
+def vis_pred_label_2(pred, label, str, out_dir='vis'):
+        
+        img_save_floder_path = osp.join(out_dir,'pred_label_imgs')
+        if not osp.exists(img_save_floder_path):
+            os.makedirs(img_save_floder_path)
+            
+        plt.cla()
+        for i in range(label.shape[0]):
+            x3 = label[i,[0,1,2,3,0],0]  
+            y3 = label[i,[0,1,2,3,0],1] 
+            plt.plot(-y3,x3,'g')
+            
+        for i in range(pred.shape[0]):
+            x = pred[i,[0,1,2,3,0],0]  
+            y = pred[i,[0,1,2,3,0],1]  
+            plt.plot(-y,x,'r')
+            
+        plt.axis('equal')   
+        img_save_path = osp.join(img_save_floder_path,str+'pred_label.png')
+        plt.savefig(img_save_path)
 
 if __name__ == '__main__':
     main()

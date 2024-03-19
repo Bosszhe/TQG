@@ -288,6 +288,8 @@ class VoxelPostprocessor(BasePostprocessor):
                                           mask_reg[0]).view(-1, 7)
             scores = torch.masked_select(prob[0], mask[0])
 
+            # from IPython import embed
+            # embed(header='sdsss')
             # convert output to bounding box
             if len(boxes3d) != 0:
                 # (N, 8, 3)
@@ -342,7 +344,8 @@ class VoxelPostprocessor(BasePostprocessor):
         scores = scores[mask]
 
         assert scores.shape[0] == pred_box3d_tensor.shape[0]
-
+        # from IPython import embed
+        # embed()
         return pred_box3d_tensor, scores
 
     @staticmethod

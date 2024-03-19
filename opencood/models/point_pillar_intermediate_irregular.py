@@ -28,6 +28,7 @@ class PointPillarIntermediateIrregular(nn.Module):
                                   kernel_size=1)
         self.reg_head = nn.Conv2d(128 * 3, 7 * args['anchor_num'],
                                   kernel_size=1)
+        self.delay = args['time_delay']
 
     def forward(self, data_dict):
 
@@ -55,12 +56,13 @@ class PointPillarIntermediateIrregular(nn.Module):
 
         # from IPython import embed
         # embed(header='forward!!!')
+        # print(record_frames)
         split_x = self.regroup(spatial_features, record_len * K)
         cur_spatial_features_list = list()
         for i in range(BS):
             cav_num = record_len[i]
-            delay = 1
-            cur_index = list(range(delay,cav_num*K+delay,K))
+            delay = self.delay
+            cur_index = list(range(delay, cav_num * K + delay, K))
             cur_index[0] = 0
 
             # print(cur_index)
@@ -71,11 +73,15 @@ class PointPillarIntermediateIrregular(nn.Module):
             cur_spatial_feature = split_x[i][cur_index,...]
             cur_spatial_features_list.append(cur_spatial_feature)
 
+
+
         cur_spatial_features = torch.cat(cur_spatial_features_list,dim=0)
         batch_dict['spatial_features'] = cur_spatial_features
         batch_dict = self.backbone(batch_dict)
         spatial_features_2d = batch_dict['spatial_features_2d']
 
+        # from IPython import embed
+        # embed(header='cls_head!!!')
         psm = self.cls_head(spatial_features_2d)
         rm = self.reg_head(spatial_features_2d)
 

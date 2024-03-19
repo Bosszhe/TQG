@@ -140,8 +140,15 @@ def compute_iou(box, boxes):
     """
     # Calculate intersection areas
     if np.any(np.array([box.union(b).area for b in boxes])==0):
+        from IPython import embed
+        embed(header='float division by zero')
         print('debug')
     iou = [box.intersection(b).area / box.union(b).area for b in boxes]
+    # try:
+    #     iou = [box.intersection(b).area / box.union(b).area for b in boxes]
+    # except:
+    #     from IPython import embed
+    #     embed(header='float division by zero')
 
     return np.array(iou, dtype=np.float32)
 

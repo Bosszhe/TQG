@@ -20,7 +20,7 @@ from scipy import stats
 import opencood
 import opencood.data_utils.post_processor as post_processor
 import opencood.utils.pcd_utils as pcd_utils
-from opencood.data_utils.datasets import basedataset
+from opencood.data_utils.datasets import basedataset_backup
 from opencood.data_utils.pre_processor import build_preprocessor
 from opencood.hypes_yaml.yaml_utils import load_yaml
 from opencood.utils.pcd_utils import \
@@ -33,13 +33,13 @@ from opencood.utils import box_utils
 # global, for debug use
 illegal_path_list = set()
 
-class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
+class IntermediateFusionDatasetIrregular(basedataset_backup.BaseDataset):
     """
     This class is for intermediate fusion where each vehicle transmit the
     deep features to ego.
     """
     def __init__(self, params, visualize, train=True):
-
+        # np.random.seed(303)
         self.times = []
 
         self.params = params
@@ -425,11 +425,7 @@ class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
                     if i == 0: # ego-past-0 与 ego-curr 是一样的
                         data[cav_id]['past_k'][i] = data[cav_id]['curr']
                         continue
-                    # sample_interval = self.sample_interval_exp
-                    # 'ego' past_k: t,t-1,t-2
                     sample_interval = 1
-                    # if sample_interval == 0:
-                    #     sample_interval = 1
                 else:                               
                     # non-ego sample_interval ~ B(n, p)
                     # 'non-ego' past_k: t,t-interval,t-interval-1,...
@@ -571,8 +567,8 @@ class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
 
         # loop over all CAVs to process information
         for cav_id, selected_cav_base in base_data_dict.items():
-            if not selected_cav_base['ego']:
-                continue
+            # if not selected_cav_base['ego']:
+            #     continue
             # check if the cav is within the communication range with ego
             # for non-ego cav, we use the latest frame's pose
             distance = math.sqrt( \
@@ -976,11 +972,14 @@ class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
         past_k_label_dicts = self.post_processor.merge_label_to_dict(past_k_label_dicts)
         '''
 
+        
         past_k_tr_mats = np.stack(past_k_tr_mats, axis=0) # (k, 4, 4)
 
         # avg_past_k_time_diffs = float(sum(past_k_time_diffs) / len(past_k_time_diffs))
         # avg_past_k_sample_interval = float(sum(past_k_sample_interval) / len(past_k_sample_interval))
 
+        # from IPython import embed
+        # embed(header="generate_object_center")
         # curr label at single view
         # opencood/data_utils/post_processor/base_postprocessor.py
         object_bbx_center, object_bbx_mask, object_ids = \
@@ -1357,8 +1356,11 @@ class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
         gt_box_tensor : torch.Tensor
             The tensor of gt bounding box.
         """
+        # from IPython import embed
+        # embed(header="xxxxxxxxxxxxx")
         pred_box_tensor, pred_score = \
             self.post_processor.post_process(data_dict, output_dict)
+    
         gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
         return pred_box_tensor, pred_score, gt_box_tensor
@@ -1473,7 +1475,7 @@ class IntermediateFusionDatasetIrregular(basedataset.BaseDataset):
         Notice: it is a wrap of postprocessor
 
         Parameters
-        ----------
+        ----------single_object_dict_stack
         cav_contents : list
             List of dictionary, save all cavs' information.
             in fact it is used in get_item_single_car, so the list length is 1
